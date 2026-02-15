@@ -1,23 +1,22 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
-var analyze = await Lines.Analyze("/Users/erik/Code/sleuth/Sleuth.Example/Program.cs");
+var analyze = Lines.AnalyzeFile("/Users/erik/Code/sleuth/Sleuth.Example/Program.cs");
 Console.WriteLine(analyze);
 
 record Lines(int Code, int Comments, int Empty)
 {
-    public static async Task<Lines> Analyze(string path)
+    public static Lines AnalyzeFile(string path) =>
+        Analyze(File.ReadAllText(path));
+    
+    public static Lines Analyze(string code)
     {
-        var code = await File.ReadAllTextAsync(path);
         var tree = CSharpSyntaxTree.ParseText(code);
-        var root = await tree.GetRootAsync();
+        var root = tree.GetRoot();
         
         var codeLines = new HashSet<int>();
         foreach (var token in root.DescendantTokens())
         {
-            if (token.IsKind(SyntaxKind.EndOfFileToken))
-                continue;
-
             var span = token.GetLocation().GetLineSpan();
             for (var line = span.StartLinePosition.Line; line <= span.EndLinePosition.Line; line++)
                 codeLines.Add(line);
