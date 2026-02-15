@@ -2,11 +2,13 @@ using LibGit2Sharp;
 
 namespace Sleuth;
 
-internal sealed class VersionControl
+internal record FrequentlyChangedFile(string File, int Count);
+
+internal static class VersionControl
 {
-    public static Dictionary<string, int> MostFrequentlyChangedFiles(string directory)
+    public static FrequentlyChangedFile[] MostFrequentlyChangedFiles(string directoryPath)
     {
-        using var repo = new Repository(directory);
+        using var repo = new Repository(directoryPath);
 
         return repo.Commits
             .QueryBy(new CommitFilter { SortBy = CommitSortStrategies.Time | CommitSortStrategies.Reverse })
@@ -16,6 +18,7 @@ internal sealed class VersionControl
                     .SelectMany(parent => repo.Diff.Compare<TreeChanges>(parent.Tree, commit.Tree)
                         .Select(change => change.OldPath)))
             .GroupBy(path => path)
-            .ToDictionary(g => g.Key, g => g.Count());
+            .Select(g => new FrequentlyChangedFile(g.Key, g.Count()))
+            .ToArray();
     }
 }

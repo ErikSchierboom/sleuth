@@ -1,15 +1,27 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.Extensions.FileSystemGlobbing;
 
-internal sealed record SourceCodeLines(int Code, int Comments, int Empty)
+internal record FileCodeCount(string File, int Code, int Comments, int Empty);
+
+internal static class CodeCount
 {
-    public static SourceCodeLines AnalyzeFile(string path) =>
-        Analyze(File.ReadAllText(path));
-    
-    public static SourceCodeLines Analyze(string code)
+    public static async Task<FileCodeCount[]> Count(string directoryPath)
     {
+        var matcher = new Matcher();
+        matcher.AddInclude("**/*.cs");
+        matcher.AddExclude("**/bin/");
+        matcher.AddExclude("**/obj/");
+
+        var result = matcher.GetResultsInFullPath(directoryPath);
+        return await Task.WhenAll(result.Select(CountFile));
+    }
+
+    private static async Task<FileCodeCount> CountFile(string filePath)
+    {
+        var code = await File.ReadAllTextAsync(filePath);
         var tree = CSharpSyntaxTree.ParseText(code);
-        var root = tree.GetRoot();
+        var root = await tree.GetRootAsync();
         
         var codeLines = new HashSet<int>();
         foreach (var token in root.DescendantTokens())
@@ -35,6 +47,6 @@ internal sealed record SourceCodeLines(int Code, int Comments, int Empty)
         commentLines.ExceptWith(codeLines);
 
         var linesCount = root.GetLocation().GetLineSpan().EndLinePosition.Line + 1;
-        return new SourceCodeLines(codeLines.Count, commentLines.Count, linesCount - codeLines.Count - commentLines.Count);
+        return new FileCodeCount(filePath, codeLines.Count, commentLines.Count, linesCount - codeLines.Count - commentLines.Count);
     }
 }

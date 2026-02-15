@@ -1,8 +1,9 @@
 ﻿using Sleuth;
 
-var analyze = SourceCodeLines.AnalyzeFile("/Users/erik/Code/sleuth/Sleuth.Example/Program.cs");
-Console.WriteLine(analyze);
-var frequentlyChangedFiles = VersionControl.MostFrequentlyChangedFiles("/Users/erik/Code/sleuth");
+var codeCounts = await CodeCount.Count("/Users/erik/Code/sleuth");
+foreach (var codeCount in codeCounts)
+    Console.WriteLine($">{codeCount.File}: code: {codeCount.Code}, comments: {codeCount.Comments}, empty: {codeCount.Empty}, lines: {codeCount.Empty}");
 
-foreach (var (file, count) in frequentlyChangedFiles)
-    Console.WriteLine($">{file}: {count}");
+var frequentlyChangedFiles = VersionControl.MostFrequentlyChangedFiles("/Users/erik/Code/sleuth");
+foreach (var frequentlyChangedFile in frequentlyChangedFiles)
+    Console.WriteLine($">{frequentlyChangedFile.File}: {frequentlyChangedFile.Count}");
