@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Sleuth/Sleuth.csproj" />
+  <Project Path="Sleuth.Example/Sleuth.Example.csproj" />
+</Solution>
