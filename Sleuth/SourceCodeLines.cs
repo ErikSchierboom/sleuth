@@ -1,12 +1,12 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
-internal record Lines(int Code, int Comments, int Empty)
+internal sealed record SourceCodeLines(int Code, int Comments, int Empty)
 {
-    public static Lines AnalyzeFile(string path) =>
+    public static SourceCodeLines AnalyzeFile(string path) =>
         Analyze(File.ReadAllText(path));
     
-    public static Lines Analyze(string code)
+    public static SourceCodeLines Analyze(string code)
     {
         var tree = CSharpSyntaxTree.ParseText(code);
         var root = tree.GetRoot();
@@ -35,6 +35,6 @@ internal record Lines(int Code, int Comments, int Empty)
         commentLines.ExceptWith(codeLines);
 
         var linesCount = root.GetLocation().GetLineSpan().EndLinePosition.Line + 1;
-        return new Lines(codeLines.Count, commentLines.Count, linesCount - codeLines.Count - commentLines.Count);
+        return new SourceCodeLines(codeLines.Count, commentLines.Count, linesCount - codeLines.Count - commentLines.Count);
     }
 }
