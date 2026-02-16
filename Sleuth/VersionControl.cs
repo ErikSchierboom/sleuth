@@ -2,11 +2,11 @@ using LibGit2Sharp;
 
 namespace Sleuth;
 
-internal record FrequentlyChangedFile(string File, int Count);
+internal record FileChanges(string File, int Count);
 
 internal static class VersionControl
 {
-    public static FrequentlyChangedFile[] MostFrequentlyChangedFiles(string directoryPath)
+    public static FileChanges[] MostFrequentlyChangedFiles(string directoryPath)
     {
         using var repo = new Repository(directoryPath);
 
@@ -18,7 +18,8 @@ internal static class VersionControl
                     .SelectMany(parent => repo.Diff.Compare<TreeChanges>(parent.Tree, commit.Tree)
                         .Select(change => change.OldPath)))
             .GroupBy(path => path)
-            .Select(g => new FrequentlyChangedFile(g.Key, g.Count()))
+            .Select(g => new FileChanges(g.Key, g.Count()))
+            .OrderByDescending(f => f.Count)
             .ToArray();
     }
 }
