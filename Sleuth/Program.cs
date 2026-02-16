@@ -1,6 +1,6 @@
 ﻿using Sleuth;
 
-var codeCounts = await CodeCount.Count("/Users/erik/Code/sleuth");
+var codeCounts = await Codebase.CountLines("/Users/erik/Code/sleuth");
 foreach (var codeCount in codeCounts)
     Console.WriteLine($">{codeCount.File}: code: {codeCount.Code}, comments: {codeCount.Comments}, empty: {codeCount.Empty}, lines: {codeCount.Empty}");
 
