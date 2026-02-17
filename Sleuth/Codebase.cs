@@ -14,8 +14,8 @@ internal class Codebase(string directoryPath)
 {
     public static async Task<CodebaseAnalysis> Analyze(string directoryPath) =>
         await new Codebase(directoryPath).Analyze();
-    
-    public async Task<CodebaseAnalysis> Analyze()
+
+    private async Task<CodebaseAnalysis> Analyze()
     {
         var matcher = new Matcher();
         matcher.AddInclude("**/*.cs");

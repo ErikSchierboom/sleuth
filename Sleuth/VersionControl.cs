@@ -10,8 +10,8 @@ internal sealed class VersionControl(string directoryPath)
 {
     public static VersionControlRepositoryAnalysis Analyze(string directoryPath) =>
         new VersionControl(directoryPath).Analyze();
-    
-    public VersionControlRepositoryAnalysis Analyze()
+
+    private VersionControlRepositoryAnalysis Analyze()
     {
         using var repo = new Repository(directoryPath);
 
