@@ -1,9 +1,9 @@
 ﻿using Sleuth;
 
-var codeCounts = await Codebase.CountLines("/Users/erik/Code/sleuth");
-foreach (var codeCount in codeCounts)
-    Console.WriteLine($">{codeCount.File}: code: {codeCount.Code}, comments: {codeCount.Comments}, empty: {codeCount.Empty}, lines: {codeCount.Empty}");
+var codebaseAnalysis = await Codebase.Analyze("/Users/erik/Code/sleuth");
+foreach (var codebaseFileAnalysis in codebaseAnalysis.Files)
+    Console.WriteLine($">{codebaseFileAnalysis.File}: code: {codebaseFileAnalysis.LineCounters.Code}, comments: {codebaseFileAnalysis.LineCounters.Comments}, empty: {codebaseFileAnalysis.LineCounters.Empty}, lines: {codebaseFileAnalysis.LineCounters.Empty}");
 
 var repositoryAnalysis = VersionControl.AnalyzeRepository("/Users/erik/Code/sleuth");
 foreach (var repositoryFileAnalysis in repositoryAnalysis.Files)
-    Console.WriteLine($">{repositoryFileAnalysis.File}: {repositoryFileAnalysis.NumberOfTimesChanged}");
+    Console.WriteLine($">{repositoryFileAnalysis.File}: times changed: {repositoryFileAnalysis.NumberOfTimesChanged}, number of authors: {repositoryFileAnalysis.Authors.Count}");

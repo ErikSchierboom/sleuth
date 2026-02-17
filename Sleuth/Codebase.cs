@@ -4,22 +4,25 @@ using Microsoft.Extensions.FileSystemGlobbing;
 
 namespace Sleuth;
 
-internal record LineCount(string File, int Code, int Comments, int Empty);
+internal record LineCounters(int Code, int Comments, int Empty);
+internal record CodebaseFileAnalysis(string File, LineCounters LineCounters);
+internal record CodebaseAnalysis(string Directory, CodebaseFileAnalysis[] Files);
 
 internal static class Codebase
 {
-    public static async Task<LineCount[]> CountLines(string directoryPath)
+    public static async Task<CodebaseAnalysis> Analyze(string directoryPath)
     {
         var matcher = new Matcher();
         matcher.AddInclude("**/*.cs");
         matcher.AddExclude("**/bin/");
         matcher.AddExclude("**/obj/");
 
-        var result = matcher.GetResultsInFullPath(directoryPath);
-        return await Task.WhenAll(result.Select(CountLinesInFile));
+        var fileAnalysesTasks = matcher.GetResultsInFullPath(directoryPath).Select(AnalyzeFile);
+        var fileAnalyses = await Task.WhenAll(fileAnalysesTasks);
+        return new CodebaseAnalysis(directoryPath, fileAnalyses);
     }
 
-    private static async Task<LineCount> CountLinesInFile(string filePath)
+    private static async Task<CodebaseFileAnalysis> AnalyzeFile(string filePath)
     {
         var code = await File.ReadAllTextAsync(filePath);
         var tree = CSharpSyntaxTree.ParseText(code);
@@ -48,7 +51,8 @@ internal static class Codebase
         }
         commentLines.ExceptWith(codeLines);
 
-        var linesCount = root.GetLocation().GetLineSpan().EndLinePosition.Line + 1;
-        return new LineCount(filePath, codeLines.Count, commentLines.Count, linesCount - codeLines.Count - commentLines.Count);
+        var lineCount = root.GetLocation().GetLineSpan().EndLinePosition.Line + 1;
+        var lineCounters = new LineCounters(codeLines.Count, commentLines.Count, lineCount - codeLines.Count - commentLines.Count);
+        return new CodebaseFileAnalysis(filePath, lineCounters);
     }
 }

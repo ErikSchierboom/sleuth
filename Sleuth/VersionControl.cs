@@ -2,7 +2,7 @@ using LibGit2Sharp;
 
 namespace Sleuth;
 
-internal record VersionControlFileAnalysis(string File, int NumberOfTimesChanged, int NumberOfAuthors);
+internal record VersionControlFileAnalysis(string File, int NumberOfTimesChanged, HashSet<string> Authors);
 
 internal record VersionControlRepositoryAnalysis(string Directory, VersionControlFileAnalysis[] Files);
 
@@ -33,7 +33,7 @@ internal static class VersionControl
         }
         
         HashSet<string> files = [..changesPerFile.Keys, ..authorsPerFile.Keys];
-        var fileAnalyses = files.Select(x => new VersionControlFileAnalysis(x, changesPerFile.GetValueOrDefault(x, 0), authorsPerFile.GetValueOrDefault(x, []).Count));
+        var fileAnalyses = files.Select(x => new VersionControlFileAnalysis(x, changesPerFile.GetValueOrDefault(x, 0), authorsPerFile.GetValueOrDefault(x, [])));
 
         return new VersionControlRepositoryAnalysis(directoryPath, [..fileAnalyses]);
     }
