@@ -6,9 +6,9 @@ namespace Sleuth;
 
 internal record FileIndentation(float Median, float Max, float Min);
 internal record LineCounters(int Code, int Comments, int Empty);
-internal record CodebaseFileAnalysis(string File, LineCounters LineCounters, FileIndentation Indentation);
-internal record DirectoryAnalysis(string Directory, int NumberOfFiles, LineCounters LineCounters);
-internal record CodebaseAnalysis(string Directory, CodebaseFileAnalysis[] Files, DirectoryAnalysis[] Directories);
+internal record CodebaseFileAnalysis(string FilePath, LineCounters LineCounters, FileIndentation Indentation);
+internal record DirectoryAnalysis(string DirectoryPath, int NumberOfFiles, LineCounters LineCounters);
+internal record CodebaseAnalysis(string DirectoryPath, CodebaseFileAnalysis[] Files, DirectoryAnalysis[] Directories);
 
 internal class Codebase(string directoryPath)
 {
@@ -98,7 +98,7 @@ internal class Codebase(string directoryPath)
 
         foreach (var file in fileAnalyses)
         {
-            var directory = Path.GetDirectoryName(file.File);
+            var directory = Path.GetDirectoryName(file.FilePath);
 
             while (directory is not null)
             {
@@ -122,7 +122,7 @@ internal class Codebase(string directoryPath)
 
         return directoryStats
             .Select(kv => new DirectoryAnalysis(kv.Key, kv.Value.Files, new LineCounters(kv.Value.Code, kv.Value.Comments, kv.Value.Empty)))
-            .OrderBy(d => d.Directory)
+            .OrderBy(d => d.DirectoryPath)
             .ToArray();
     }
 }
