@@ -6,6 +6,7 @@ namespace Sleuth;
 
 internal record LineCounters(int Code, int Comments, int Empty);
 internal record CodebaseFileAnalysis(string File, LineCounters LineCounters);
+internal record DirectoryAnalysis(string Directory, int NumberOfFiles, int NumberOfLinesOfCode);
 internal record CodebaseAnalysis(string Directory, CodebaseFileAnalysis[] Files);
 
 internal static class Codebase
