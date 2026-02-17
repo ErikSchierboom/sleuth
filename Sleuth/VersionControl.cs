@@ -4,11 +4,14 @@ namespace Sleuth;
 
 internal record VersionControlFileAnalysis(string File, int NumberOfTimesChanged, HashSet<string> Authors);
 
-internal record VersionControlRepositoryAnalysis(string Directory, VersionControlFileAnalysis[] Files);
+internal record VersionControlRepositoryAnalysis(string Directories, VersionControlFileAnalysis[] Files);
 
-internal static class VersionControl
+internal sealed class VersionControl(string directoryPath)
 {
-    public static VersionControlRepositoryAnalysis AnalyzeRepository(string directoryPath)
+    public static VersionControlRepositoryAnalysis Analyze(string directoryPath) =>
+        new VersionControl(directoryPath).Analyze();
+    
+    public VersionControlRepositoryAnalysis Analyze()
     {
         using var repo = new Repository(directoryPath);
 
@@ -33,7 +36,9 @@ internal static class VersionControl
         }
         
         HashSet<string> files = [..changesPerFile.Keys, ..authorsPerFile.Keys];
-        var fileAnalyses = files.Select(x => new VersionControlFileAnalysis(x, changesPerFile.GetValueOrDefault(x, 0), authorsPerFile.GetValueOrDefault(x, [])));
+        var fileAnalyses = files
+            .Select(x => new VersionControlFileAnalysis(x, changesPerFile.GetValueOrDefault(x, 0), authorsPerFile.GetValueOrDefault(x, [])))
+            .OrderBy(x => x.File);
 
         return new VersionControlRepositoryAnalysis(directoryPath, [..fileAnalyses]);
     }

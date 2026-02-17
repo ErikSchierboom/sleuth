@@ -4,14 +4,18 @@ using Microsoft.Extensions.FileSystemGlobbing;
 
 namespace Sleuth;
 
+internal record FileIndentation(float Median, float Max, float Min);
 internal record LineCounters(int Code, int Comments, int Empty);
-internal record CodebaseFileAnalysis(string File, LineCounters LineCounters);
-internal record DirectoryAnalysis(string Directory, int NumberOfFiles, int NumberOfLinesOfCode);
-internal record CodebaseAnalysis(string Directory, CodebaseFileAnalysis[] Files);
+internal record CodebaseFileAnalysis(string File, LineCounters LineCounters, FileIndentation Indentation);
+internal record DirectoryAnalysis(string Directory, int NumberOfFiles, LineCounters LineCounters);
+internal record CodebaseAnalysis(string Directory, CodebaseFileAnalysis[] Files, DirectoryAnalysis[] Directories);
 
-internal static class Codebase
+internal class Codebase(string directoryPath)
 {
-    public static async Task<CodebaseAnalysis> Analyze(string directoryPath)
+    public static async Task<CodebaseAnalysis> Analyze(string directoryPath) =>
+        await new Codebase(directoryPath).Analyze();
+    
+    public async Task<CodebaseAnalysis> Analyze()
     {
         var matcher = new Matcher();
         matcher.AddInclude("**/*.cs");
@@ -20,7 +24,8 @@ internal static class Codebase
 
         var fileAnalysesTasks = matcher.GetResultsInFullPath(directoryPath).Select(AnalyzeFile);
         var fileAnalyses = await Task.WhenAll(fileAnalysesTasks);
-        return new CodebaseAnalysis(directoryPath, fileAnalyses);
+        var directoryAnalyses = AnalyzeDirectories(directoryPath, fileAnalyses);
+        return new CodebaseAnalysis(directoryPath, fileAnalyses, directoryAnalyses);
     }
 
     private static async Task<CodebaseFileAnalysis> AnalyzeFile(string filePath)
@@ -29,6 +34,13 @@ internal static class Codebase
         var tree = CSharpSyntaxTree.ParseText(code);
         var root = await tree.GetRootAsync();
 
+        var lineCounters = CountLines(root);
+        var indentation = CalculateIndentationStats(code);
+        return new CodebaseFileAnalysis(filePath, lineCounters, indentation);
+    }
+
+    private static LineCounters CountLines(SyntaxNode root)
+    {
         var codeLines = new HashSet<int>();
         foreach (var token in root.DescendantTokens())
         {
@@ -53,7 +65,64 @@ internal static class Codebase
         commentLines.ExceptWith(codeLines);
 
         var lineCount = root.GetLocation().GetLineSpan().EndLinePosition.Line + 1;
-        var lineCounters = new LineCounters(codeLines.Count, commentLines.Count, lineCount - codeLines.Count - commentLines.Count);
-        return new CodebaseFileAnalysis(filePath, lineCounters);
+        return new LineCounters(codeLines.Count, commentLines.Count, lineCount - codeLines.Count - commentLines.Count);
+    }
+
+    private static FileIndentation CalculateIndentationStats(string code)
+    {
+        var indentations = new List<int>();
+        foreach (var line in code.EnumerateLines())
+        {
+            var indentation = 0;
+
+            foreach (var c in line)
+            {
+                if (!char.IsWhiteSpace(c))
+                    break;
+                   
+                indentation += c == '\t' ? 4 : 1;
+            }
+            
+            indentations.Add(indentation);
+        }
+        
+        if (indentations.Count == 0)
+            return new FileIndentation(0, 0, 0);
+        
+        return new FileIndentation(indentations[indentations.Count / 2], indentations.Max(), indentations.Min());
+    }
+
+    private static DirectoryAnalysis[] AnalyzeDirectories(string rootDirectory, CodebaseFileAnalysis[] fileAnalyses)
+    {
+        var directoryStats = new Dictionary<string, (int Files, int Code, int Comments, int Empty)>();
+
+        foreach (var file in fileAnalyses)
+        {
+            var directory = Path.GetDirectoryName(file.File);
+
+            while (directory is not null)
+            {
+                if (!directoryStats.ContainsKey(directory))
+                    directoryStats[directory] = (0, 0, 0, 0);
+
+                var stats = directoryStats[directory];
+                directoryStats[directory] = (
+                    stats.Files + 1,
+                    stats.Code + file.LineCounters.Code,
+                    stats.Comments + file.LineCounters.Comments,
+                    stats.Empty + file.LineCounters.Empty
+                );
+                
+                if (directory == rootDirectory)
+                    break;
+
+                directory = Path.GetDirectoryName(directory);
+            }
+        }
+
+        return directoryStats
+            .Select(kv => new DirectoryAnalysis(kv.Key, kv.Value.Files, new LineCounters(kv.Value.Code, kv.Value.Comments, kv.Value.Empty)))
+            .OrderBy(d => d.Directory)
+            .ToArray();
     }
 }
