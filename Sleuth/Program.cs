@@ -5,14 +5,12 @@ using Sleuth;
 const string repoDirectoryPath = "/Users/erik/Code/cito/Construction.Platform";
 var codebaseDirectoryPath = Path.Combine(repoDirectoryPath, "Backend");
 
-var sw = Stopwatch.StartNew();
+var startNew = Stopwatch.StartNew();
 var versionControlRepositoryAnalysis = VersionControl.Analyze(repoDirectoryPath, Path.GetRelativePath(repoDirectoryPath, codebaseDirectoryPath));
-Console.WriteLine(sw.ElapsedMilliseconds);
-sw = Stopwatch.StartNew();
-var codebaseAnalysis = await Codebase.Analyze(codebaseDirectoryPath);
-Console.WriteLine(sw.ElapsedMilliseconds);
+var codebaseAnalysis = Codebase.Analyze(codebaseDirectoryPath);
 
-var analysis = new Analysis(versionControlRepositoryAnalysis, codebaseAnalysis);
+var analysis = new Analysis(await versionControlRepositoryAnalysis, await codebaseAnalysis);
+Console.WriteLine(startNew.ElapsedMilliseconds);
 
 const string fileName = "/Users/erik/Code/sleuth/analysis.json";
 await using var outputStream = File.Create(fileName);

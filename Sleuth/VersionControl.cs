@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace Sleuth;
 
 internal sealed record VersionControlFileAnalysis(string FilePath, int NumberOfTimesChanged, HashSet<string> Authors, DateTimeOffset LastChangedAt);
@@ -6,81 +8,60 @@ internal sealed record VersionControlRepositoryAnalysis(string DirectoryPath, Ve
 
 internal sealed class VersionControl(string directoryPath, string path)
 {
-    public static VersionControlRepositoryAnalysis Analyze(string directoryPath, string path) =>
-        new VersionControl(directoryPath, path).Analyze();
+    public static async Task<VersionControlRepositoryAnalysis> Analyze(string directoryPath, string path) =>
+        await new VersionControl(directoryPath, path).Analyze();
 
-    private VersionControlRepositoryAnalysis Analyze()
+    private async Task<VersionControlRepositoryAnalysis> Analyze()
         {
             var changesPerFile = new Dictionary<string, int>();
             var authorsPerFile = new Dictionary<string, HashSet<string>>();
             var lastChangedDatePerFile = new Dictionary<string, DateTimeOffset>();
 
             // Use git log with numstat for efficient file-level analysis
-            var startInfo = new System.Diagnostics.ProcessStartInfo
+            var startInfo = new ProcessStartInfo
             {
                 FileName = "git",
-                Arguments = $"log --numstat --format=%H%n%an%n%aI%n --all -- {path}",
+                Arguments = $"--no-pager log --format=\"%an%x09%aI\" --numstat --no-renames --no-merges --remove-empty --shortstat --all -- {path}",
                 WorkingDirectory = directoryPath,
                 RedirectStandardOutput = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
+            using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start git process");
 
-            using var process = System.Diagnostics.Process.Start(startInfo);
-            if (process == null) throw new InvalidOperationException("Failed to start git process");
-
-            string? currentHash = null;
-            string? currentAuthor = null;
-            DateTimeOffset currentDate = default;
-            var lineIndex = 0;
-
-            while (!process.StandardOutput.EndOfStream)
+            while (true)
             {
-                var line = process.StandardOutput.ReadLine();
-                if (string.IsNullOrWhiteSpace(line))
-                {
-                    lineIndex = 0;
-                    continue;
-                }
+                var header = await process.StandardOutput.ReadLineAsync();
+                if (string.IsNullOrEmpty(header))
+                    break;
 
-                if (currentHash == null)
+                var parts = header.Split('\t');
+                var author = parts[0];
+                var date = DateTimeOffset.Parse(parts[1]);
+                
+                await process.StandardOutput.ReadLineAsync(); // Skip blank line after commit header
+
+                while (true)
                 {
-                    // Reading commit header (3 lines)
-                    switch (lineIndex)
-                    {
-                        case 0:
-                            currentHash = line;
-                            break;
-                        case 1:
-                            currentAuthor = line;
-                            break;
-                        case 2:
-                            currentDate = DateTimeOffset.Parse(line);
-                            break;
-                    }
-                    lineIndex++;
-                }
-                else
-                {
-                    // Reading file changes (format: additions deletions filename)
-                    var parts = line.Split('\t', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length >= 3)
-                    {
-                        var filePath = parts[2];
+                    var fileChangeSummary = await process.StandardOutput.ReadLineAsync();
+                    if (string.IsNullOrEmpty(fileChangeSummary) || fileChangeSummary.StartsWith(' '))
+                        break;
+                    
+                    var filePath = fileChangeSummary[fileChangeSummary.LastIndexOf('\t')..];
+                    authorsPerFile.TryAdd(filePath, []);
+                    authorsPerFile[filePath].Add(author);
                         
-                        authorsPerFile.TryAdd(filePath, []);
-                        authorsPerFile[filePath].Add(currentAuthor!);
-                        
-                        changesPerFile[filePath] = changesPerFile.GetValueOrDefault(filePath, 0) + 1;
-                        lastChangedDatePerFile.TryAdd(filePath, currentDate);
-                    }
+                    changesPerFile[filePath] = changesPerFile.GetValueOrDefault(filePath, 0) + 1;
+                    lastChangedDatePerFile.TryAdd(filePath, date);
                 }
             }
 
-            process.WaitForExit();
+            await process.WaitForExitAsync();
 
-            HashSet<string> files = [..changesPerFile.Keys, ..authorsPerFile.Keys];
-            var fileAnalyses = files
+            Debug.Assert(changesPerFile.Count == authorsPerFile.Count);
+            Debug.Assert(lastChangedDatePerFile.Count == authorsPerFile.Count);
+
+            var fileAnalyses = changesPerFile.Keys
                 .Select(file => new VersionControlFileAnalysis(
                     file,
                     changesPerFile.GetValueOrDefault(file, 0), 
