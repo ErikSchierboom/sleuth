@@ -1,22 +1,21 @@
-﻿using Sleuth;
+﻿using System.Diagnostics;
+using System.Text.Json;
+using Sleuth;
 
-var directory = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", ".."));
+const string repoDirectoryPath = "/Users/erik/Code/cito/Construction.Platform";
+var codebaseDirectoryPath = Path.Combine(repoDirectoryPath, "Backend");
 
-var codebaseAnalysis = await Codebase.Analyze(directory);
-foreach (var codebaseFileAnalysis in codebaseAnalysis.Files)
-{
-    Console.WriteLine($">{codebaseFileAnalysis.FilePath}");
-    Console.WriteLine($"  Lines: code={codebaseFileAnalysis.LineCounters.Code}, comments={codebaseFileAnalysis.LineCounters.Comments}, empty={codebaseFileAnalysis.LineCounters.Empty}, lines={codebaseFileAnalysis.LineCounters.Empty}");
-    Console.WriteLine($"  Indentation: median={codebaseFileAnalysis.Indentation.Median}, max={codebaseFileAnalysis.Indentation.Max}, min={codebaseFileAnalysis.Indentation.Min}");
-}
+var sw = Stopwatch.StartNew();
+var versionControlRepositoryAnalysis = VersionControl.Analyze(repoDirectoryPath, Path.GetRelativePath(repoDirectoryPath, codebaseDirectoryPath));
+Console.WriteLine(sw.ElapsedMilliseconds);
+sw = Stopwatch.StartNew();
+var codebaseAnalysis = await Codebase.Analyze(codebaseDirectoryPath);
+Console.WriteLine(sw.ElapsedMilliseconds);
 
-Console.WriteLine();
+var analysis = new Analysis(versionControlRepositoryAnalysis, codebaseAnalysis);
 
-foreach (var codebaseDirectoryAnalysis in codebaseAnalysis.Directories)
-    Console.WriteLine($">{codebaseDirectoryAnalysis.DirectoryPath}: files: {codebaseDirectoryAnalysis.NumberOfFiles}, code: {codebaseDirectoryAnalysis.LineCounters.Code}, comments: {codebaseDirectoryAnalysis.LineCounters.Comments}, empty: {codebaseDirectoryAnalysis.LineCounters.Empty}, lines: {codebaseDirectoryAnalysis.LineCounters.Empty}");
+const string fileName = "/Users/erik/Code/sleuth/analysis.json";
+await using var outputStream = File.Create(fileName);
+await JsonSerializer.SerializeAsync(outputStream, analysis, new JsonSerializerOptions { WriteIndented = true });
 
-Console.WriteLine();
-
-var repositoryAnalysis = VersionControl.Analyze(directory);
-foreach (var repositoryFileAnalysis in repositoryAnalysis.Files)
-    Console.WriteLine($">{repositoryFileAnalysis.FilePath}: times changed: {repositoryFileAnalysis.NumberOfTimesChanged}, number of authors: {repositoryFileAnalysis.Authors.Count}");
+internal sealed record Analysis(VersionControlRepositoryAnalysis Repository, CodebaseAnalysis Codebase);
