@@ -2,16 +2,14 @@ using System.Diagnostics;
 
 namespace Sleuth;
 
-internal sealed record VersionControlFileAnalysis(string FilePath, int NumberOfTimesChanged, HashSet<string> Authors, DateTimeOffset LastChangedAt);
-
-internal sealed record VersionControlRepositoryAnalysis(string DirectoryPath, VersionControlFileAnalysis[] Files);
+internal sealed record VersionControlFileAnalysis(int NumberOfTimesChanged, HashSet<string> Authors, DateTimeOffset LastChangedAt);
 
 internal sealed class VersionControl(string directoryPath, string path)
 {
-    public static async Task<VersionControlRepositoryAnalysis> Analyze(string directoryPath, string path) =>
+    public static async Task<Dictionary<string, VersionControlFileAnalysis>> Analyze(string directoryPath, string path) =>
         await new VersionControl(directoryPath, path).Analyze();
 
-    private async Task<VersionControlRepositoryAnalysis> Analyze()
+    private async Task<Dictionary<string, VersionControlFileAnalysis>> Analyze()
         {
             var changesPerFile = new Dictionary<string, int>();
             var authorsPerFile = new Dictionary<string, HashSet<string>>();
@@ -47,7 +45,7 @@ internal sealed class VersionControl(string directoryPath, string path)
                     if (string.IsNullOrEmpty(fileChangeSummary) || fileChangeSummary.StartsWith(' '))
                         break;
                     
-                    var filePath = fileChangeSummary[fileChangeSummary.LastIndexOf('\t')..];
+                    var filePath = Path.GetRelativePath(path, fileChangeSummary[(fileChangeSummary.LastIndexOf('\t') + 1)..]);
                     authorsPerFile.TryAdd(filePath, []);
                     authorsPerFile[filePath].Add(author);
                         
@@ -61,15 +59,11 @@ internal sealed class VersionControl(string directoryPath, string path)
             Debug.Assert(changesPerFile.Count == authorsPerFile.Count);
             Debug.Assert(lastChangedDatePerFile.Count == authorsPerFile.Count);
 
-            var fileAnalyses = changesPerFile.Keys
-                .Select(file => new VersionControlFileAnalysis(
-                    file,
+            return changesPerFile.Keys
+                .Select(file => (file, new VersionControlFileAnalysis(
                     changesPerFile.GetValueOrDefault(file, 0), 
                     authorsPerFile.GetValueOrDefault(file, []),
-                    lastChangedDatePerFile.GetValueOrDefault(file, DateTimeOffset.MinValue)))
-                .OrderBy(analysis => analysis.FilePath)
-                .ToArray();
-
-            return new VersionControlRepositoryAnalysis(directoryPath, fileAnalyses);
+                    lastChangedDatePerFile.GetValueOrDefault(file, DateTimeOffset.MinValue))))
+                .ToDictionary();
         }
 }

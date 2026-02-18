@@ -6,15 +6,14 @@ namespace Sleuth;
 
 internal sealed record FileIndentation(float Average, float Min, float Max);
 internal sealed record LineCounters(int Code, int Comments, int Empty);
-internal sealed record CodebaseFileAnalysis(string FilePath, LineCounters LineCounters, FileIndentation Indentation);
-internal sealed record CodebaseAnalysis(string DirectoryPath, CodebaseFileAnalysis[] Files);
+internal sealed record CodebaseFileAnalysis(LineCounters LineCounters, FileIndentation Indentation);
 
 internal class Codebase(string directoryPath)
 {
-    public static async Task<CodebaseAnalysis> Analyze(string directoryPath) =>
+    public static async Task<Dictionary<string,CodebaseFileAnalysis>> Analyze(string directoryPath) =>
         await new Codebase(directoryPath).Analyze();
 
-    private async Task<CodebaseAnalysis> Analyze()
+    private async Task<Dictionary<string,CodebaseFileAnalysis>> Analyze()
     {
         var matcher = new Matcher();
         matcher.AddInclude("**/*.cs");
@@ -23,11 +22,10 @@ internal class Codebase(string directoryPath)
 
         var fileAnalysesTasks = matcher.GetResultsInFullPath(directoryPath).Select(AnalyzeFile);
         var fileAnalyses = await Task.WhenAll(fileAnalysesTasks);
-
-        return new CodebaseAnalysis(directoryPath, fileAnalyses);
+        return fileAnalyses.ToDictionary();
     }
 
-    private async Task<CodebaseFileAnalysis> AnalyzeFile(string filePath)
+    private async Task<(string, CodebaseFileAnalysis)> AnalyzeFile(string filePath)
     {
         var code = await File.ReadAllTextAsync(filePath);
         var tree = CSharpSyntaxTree.ParseText(code);
@@ -35,7 +33,10 @@ internal class Codebase(string directoryPath)
 
         var lineCounters = CountLines(root);
         var indentation = CalculateIndentationStats(code);
-        return new CodebaseFileAnalysis(Path.GetRelativePath(directoryPath, filePath), lineCounters, indentation);
+        
+        var relativePath = Path.GetRelativePath(directoryPath, filePath);
+        var codebaseFileAnalysis = new CodebaseFileAnalysis(lineCounters, indentation);
+        return (relativePath, codebaseFileAnalysis);
     }
 
     private static LineCounters CountLines(SyntaxNode root)
