@@ -1,39 +1,57 @@
-﻿namespace Sleuth;
+﻿using System.CommandLine;
+
+namespace Sleuth;
 
 internal static class Program
-{
+{   
     public static async Task<int> Main(string[] args)
     {
-        var codebaseDirectoryPath = args.FirstOrDefault();
-        if (codebaseDirectoryPath is null)
+        var pathArg = new Argument<DirectoryInfo>("path")
         {
-            await Console.Error.WriteLineAsync("Please specify a directory to analyze.");
-            return 1;
-        }
-        
-        var codebaseDirectory = new DirectoryInfo(codebaseDirectoryPath);
-        if (!codebaseDirectory.Exists)
+            Description = "The path to the codebase to analyze."
+        };
+        var outputFormatOption = new Option<OutputFormat>("--output")
         {
-            await Console.Error.WriteLineAsync($"Specified directory does not exist: {codebaseDirectoryPath}");
-            return 2;
-        }
-        
-        var repoDirectory = new DirectoryInfo(codebaseDirectory.FullName);
-        while (repoDirectory.Exists && !Directory.Exists(Path.Combine(repoDirectory.FullName, ".git")))
+            Description = "The format of the output file.",
+            DefaultValueFactory = _ => OutputFormat.csv
+        };
+        var outputDirectoryOption = new Option<DirectoryInfo>("--output-dir")
         {
-            if (repoDirectory.Parent is null)
-            {
-                await Console.Error.WriteLineAsync("Could not find .git directory in specified directory or its parent directories.");
-                return 2;
-            }
+            Description = "The format of the output file.",
+            DefaultValueFactory = _ => new DirectoryInfo(Directory.GetCurrentDirectory())
+        };
         
-            repoDirectory = repoDirectory.Parent;
-        }
-        
-        var fileAnalyses = await Analyzer.Analyze(repoDirectory, codebaseDirectory);
+        var rootCommand = new RootCommand("Analyze a C# codebase for metrics.");
+        rootCommand.Arguments.Add(pathArg);
+        rootCommand.Options.Add(outputFormatOption);
+        rootCommand.Options.Add(outputDirectoryOption);
 
-        await Output.WriteToJson("/Users/erik/Code/sleuth/analysis.json", fileAnalyses);
-        await Output.WriteToCsv("/Users/erik/Code/sleuth/analysis.csv", fileAnalyses);
-        return 0;
+        rootCommand.SetAction(async parseResult =>
+        {
+            var codebaseDirectory = parseResult.GetValue(pathArg)!;
+            var fileAnalyses = await Analyzer.Analyze(codebaseDirectory);
+            
+            var outputFormat = parseResult.GetRequiredValue<OutputFormat>(outputFormatOption.Name);
+            var outputDirectory = parseResult.GetRequiredValue<DirectoryInfo>(outputDirectoryOption.Name);
+            switch (outputFormat)
+            {
+                case OutputFormat.csv:
+                    await Output.WriteToCsv(Path.Combine(outputDirectory.FullName, "analysis.csv"), fileAnalyses);
+                    break;
+                case OutputFormat.json:
+                    await Output.WriteToJson(Path.Combine(outputDirectory.FullName, "analysis.json"), fileAnalyses);
+                    break;
+            }
+            
+            return 0;
+        });
+
+        return await rootCommand.Parse(args).InvokeAsync();
+    }
+    
+    private enum OutputFormat
+    {
+        csv,
+        json
     }
 }

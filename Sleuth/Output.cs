@@ -6,7 +6,7 @@ using CsvHelper.Configuration;
 namespace Sleuth;
 
 internal static class Output
-{   
+{
     public static async Task WriteToJson(string filePath, FileAnalysis[] analyses)
     {
         await using var outputStream = File.Create(filePath);

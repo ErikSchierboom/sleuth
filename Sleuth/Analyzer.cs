@@ -4,7 +4,17 @@ internal sealed record FileAnalysis(string FilePath, VersionControlFileAnalysis 
 
 internal static class Analyzer
 {
-    public static async Task<FileAnalysis[]> Analyze(DirectoryInfo repoDirectory, DirectoryInfo codebaseDirectory)
+    public static async Task<FileAnalysis[]> Analyze(DirectoryInfo codebaseDirectory)
+    {
+        var repoDirectory = new DirectoryInfo(codebaseDirectory.FullName);
+        
+        while (repoDirectory.Exists && !Directory.Exists(Path.Combine(repoDirectory.FullName, ".git")))
+            repoDirectory = repoDirectory.Parent ?? throw new InvalidOperationException("Could not find .git directory in specified directory or its parent directories.");
+        
+        return await Analyze(codebaseDirectory, repoDirectory);
+    }
+    
+    public static async Task<FileAnalysis[]> Analyze(DirectoryInfo codebaseDirectory, DirectoryInfo repoDirectory)
     {
         var versionControlFileAnalyses = await VersionControl.Analyze(repoDirectory, codebaseDirectory);
         var codebaseFileAnalyses = await Codebase.Analyze(codebaseDirectory);
