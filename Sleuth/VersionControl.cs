@@ -4,10 +4,10 @@ namespace Sleuth;
 
 internal sealed record VersionControlFileAnalysis(int NumberOfTimesChanged, HashSet<string> Authors, DateTimeOffset LastChangedAt);
 
-internal sealed class VersionControl(string directoryPath, string path)
+internal sealed class VersionControl(DirectoryInfo repoDirectory, DirectoryInfo codebaseDirectory)
 {
-    public static async Task<Dictionary<string, VersionControlFileAnalysis>> Analyze(string directoryPath, string path) =>
-        await new VersionControl(directoryPath, path).Analyze();
+    public static async Task<Dictionary<string, VersionControlFileAnalysis>> Analyze(DirectoryInfo repoDirectory, DirectoryInfo codebaseDirectory) =>
+        await new VersionControl(repoDirectory, codebaseDirectory).Analyze();
 
     private async Task<Dictionary<string, VersionControlFileAnalysis>> Analyze()
         {
@@ -16,11 +16,12 @@ internal sealed class VersionControl(string directoryPath, string path)
             var lastChangedDatePerFile = new Dictionary<string, DateTimeOffset>();
 
             // Use git log with numstat for efficient file-level analysis
+            var path = Path.GetRelativePath(repoDirectory.FullName, codebaseDirectory.FullName);
             var startInfo = new ProcessStartInfo
             {
                 FileName = "git",
                 Arguments = $"--no-pager log --format=\"%an%x09%aI\" --numstat --no-renames --no-merges --remove-empty --shortstat --all -- {path}",
-                WorkingDirectory = directoryPath,
+                WorkingDirectory = repoDirectory.FullName,
                 RedirectStandardOutput = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
@@ -45,7 +46,9 @@ internal sealed class VersionControl(string directoryPath, string path)
                     if (string.IsNullOrEmpty(fileChangeSummary) || fileChangeSummary.StartsWith(' '))
                         break;
                     
-                    var filePath = Path.GetRelativePath(path, fileChangeSummary[(fileChangeSummary.LastIndexOf('\t') + 1)..]);
+                    var relativeFilePath = fileChangeSummary[(fileChangeSummary.LastIndexOf('\t') + 1)..];
+                    var filePath = Path.GetRelativePath(codebaseDirectory.FullName, Path.Combine(repoDirectory.FullName, relativeFilePath));
+                    
                     authorsPerFile.TryAdd(filePath, []);
                     authorsPerFile[filePath].Add(author);
                         

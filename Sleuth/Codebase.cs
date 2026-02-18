@@ -8,10 +8,10 @@ internal sealed record FileIndentation(float Average, float Min, float Max);
 internal sealed record LineCounters(int Code, int Comments, int Empty);
 internal sealed record CodebaseFileAnalysis(LineCounters LineCounters, FileIndentation Indentation);
 
-internal class Codebase(string directoryPath)
+internal class Codebase(DirectoryInfo directory)
 {
-    public static async Task<Dictionary<string,CodebaseFileAnalysis>> Analyze(string directoryPath) =>
-        await new Codebase(directoryPath).Analyze();
+    public static async Task<Dictionary<string,CodebaseFileAnalysis>> Analyze(DirectoryInfo directory) =>
+        await new Codebase(directory).Analyze();
 
     private async Task<Dictionary<string,CodebaseFileAnalysis>> Analyze()
     {
@@ -20,7 +20,7 @@ internal class Codebase(string directoryPath)
         matcher.AddExclude("**/bin/");
         matcher.AddExclude("**/obj/");
 
-        var fileAnalysesTasks = matcher.GetResultsInFullPath(directoryPath).Select(AnalyzeFile);
+        var fileAnalysesTasks = matcher.GetResultsInFullPath(directory.FullName).Select(AnalyzeFile);
         var fileAnalyses = await Task.WhenAll(fileAnalysesTasks);
         return fileAnalyses.ToDictionary();
     }
@@ -34,7 +34,7 @@ internal class Codebase(string directoryPath)
         var lineCounters = CountLines(root);
         var indentation = CalculateIndentationStats(code);
         
-        var relativePath = Path.GetRelativePath(directoryPath, filePath);
+        var relativePath = Path.GetRelativePath(directory.FullName, filePath);
         var codebaseFileAnalysis = new CodebaseFileAnalysis(lineCounters, indentation);
         return (relativePath, codebaseFileAnalysis);
     }
