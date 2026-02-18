@@ -11,6 +11,7 @@ internal class Analyzer
 
         return codebaseFileAnalyses
             .Select(kv => new FileAnalysis(kv.Key, versionControlFileAnalyses[kv.Key], kv.Value))
+            .OrderBy(fileAnalysis => fileAnalysis.FilePath)
             .ToArray();
     }
 }
