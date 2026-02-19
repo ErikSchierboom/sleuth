@@ -13,7 +13,7 @@ internal static class Program
         var outputFormatOption = new Option<OutputFormat>("--output")
         {
             Description = "The format of the output file.",
-            DefaultValueFactory = _ => OutputFormat.csv
+            DefaultValueFactory = _ => OutputFormat.Csv,
         };
         var outputDirectoryOption = new Option<DirectoryInfo>("--output-dir")
         {
@@ -33,25 +33,12 @@ internal static class Program
             
             var outputFormat = parseResult.GetRequiredValue<OutputFormat>(outputFormatOption.Name);
             var outputDirectory = parseResult.GetRequiredValue<DirectoryInfo>(outputDirectoryOption.Name);
-            switch (outputFormat)
-            {
-                case OutputFormat.csv:
-                    await Output.WriteToCsv(Path.Combine(outputDirectory.FullName, "analysis.csv"), fileAnalyses);
-                    break;
-                case OutputFormat.json:
-                    await Output.WriteToJson(Path.Combine(outputDirectory.FullName, "analysis.json"), fileAnalyses);
-                    break;
-            }
+            var outputFilePath = Path.Combine(outputDirectory.FullName, "analysis.csv");
+            await Output.WriteToFile(outputFilePath, fileAnalyses, outputFormat);
             
             return 0;
         });
 
         return await rootCommand.Parse(args).InvokeAsync();
-    }
-    
-    private enum OutputFormat
-    {
-        csv,
-        json
     }
 }

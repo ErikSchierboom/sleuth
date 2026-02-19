@@ -5,9 +5,25 @@ using CsvHelper.Configuration;
 
 namespace Sleuth;
 
+public enum OutputFormat
+{
+    Csv,
+    Json
+}
+
 internal static class Output
 {
-    public static async Task WriteToJson(string filePath, FileAnalysis[] analyses)
+    public static async Task WriteToFile(string filePath, FileAnalysis[] analyses, OutputFormat format)
+    {
+        if (format == OutputFormat.Csv)
+            await WriteToCsv(filePath, analyses);
+        else if (format == OutputFormat.Json)
+            await WriteToJson(filePath, analyses);
+        else
+            throw new ArgumentOutOfRangeException(nameof(format));
+    }
+
+    private static async Task WriteToJson(string filePath, FileAnalysis[] analyses)
     {
         await using var outputStream = File.Create(filePath);
         await JsonSerializer.SerializeAsync(outputStream, analyses, _jsonSerializerOptions);
@@ -15,7 +31,7 @@ internal static class Output
     
     private static readonly JsonSerializerOptions _jsonSerializerOptions = new() { WriteIndented = true };
 
-    public static async Task WriteToCsv(string filePath, FileAnalysis[] analyses)
+    private static async Task WriteToCsv(string filePath, FileAnalysis[] analyses)
     {
         await using var writer = new StreamWriter(filePath);
         await using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
