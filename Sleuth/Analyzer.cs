@@ -13,8 +13,8 @@ internal static class Analyzer
         
         return await Analyze(codebaseDirectory, repoDirectory);
     }
-    
-    public static async Task<FileAnalysis[]> Analyze(DirectoryInfo codebaseDirectory, DirectoryInfo repoDirectory)
+
+    private static async Task<FileAnalysis[]> Analyze(DirectoryInfo codebaseDirectory, DirectoryInfo repoDirectory)
     {
         var versionControlFileAnalyses = await VersionControl.Analyze(repoDirectory, codebaseDirectory);
         var codebaseFileAnalyses = await Codebase.Analyze(codebaseDirectory);
